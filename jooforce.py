@@ -176,11 +176,15 @@ print('      --url       : the URL of the Joomla login page                 ')
 print('      --user      : the username to attempt to login as              ')
 print('      --useragent : the user-agent string to post                    ')
 print('      -v          : enable verbose output                            ')
+print('      --p <path>  : point to the proxy list file                     ')
+print('      -r          : randomise proxy selection                        ')
 print('')
 print('')
 
 verboseMode = False
+isRandom = False
 dictionaryPath = None
+proxypath = None
 url = None
 user = None
 useragent = None
@@ -199,7 +203,10 @@ for arg in sys.argv:
 		user = sys.argv[arg_index + 1]
 	elif (arg == "--useragent"):
 		useragent = sys.argv[arg_index + 1]
-
+	elif (arg=="--p"):
+		proxyPath = sys.argv[arg_index +1]
+	elif (arg=="-r"):
+		isRandom = True
 	arg_index = arg_index + 1
 		
 
