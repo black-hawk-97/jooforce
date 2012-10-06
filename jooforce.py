@@ -14,12 +14,48 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
+import random
 import sys
 import urllib
 import urllib2
 
+
 INVALID_LOGIN_CONST = "Use a valid username and password to gain access"
+
+class ProxyStack:
+    file_path=""
+    raw_data = [] # raw data read in from txt file
+    proxies = [] # proxies
+    curr_index = 0
+    
+    def __init__(self,filep):
+        self.file_path = filep
+        
+    def parse(self):
+        try:
+            with open(self.file_path,'r') as f:
+                self.raw_data = (f.readlines())
+                for row in self.raw_data:
+                    if not ":" in row:
+                        row = row.rstrip() + ':80'                    
+                    self.proxies.append(row.rstrip()) # strip out /n chars using row.rstrip
+        except IOError:
+               print( "Failed to open proxy list : %s\n" % (self.file_path) )
+                       
+    def getRandomProxy(self):
+        x = len(self.proxies)
+        index = random.randint(0,x)
+        if not index == self.curr_index:
+            self.curr_index = index
+            index = 0
+            return self.proxies[self.curr_index - 1]
+        else:
+            return self.getRandomProxy()
+
+    def getProxy(self):
+        if self.curr_index < len(self.proxies) :
+            self.curr_index = self.curr_index + 1
+            return self.proxies[self.curr_index - 1]
 
 class HttpPostRequest:
 	"""A class that posts data to a URL via HTTP"""
