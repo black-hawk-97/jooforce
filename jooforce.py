@@ -82,13 +82,10 @@ class HttpPostRequest:
 
         try:
             if (self.proxy_address != None):
-                urllib2.install_opener(
-                    urllib2.build_opener(
-                        urllib2.ProxyHandler({'http': self.proxy_address})
-                        )
-                    )
-
-            response = urllib2.urlopen(request)
+                opener = urllib2.build_opener(urllib2.ProxyHandler({'http': self.proxy_address}))
+                response = opener.open(request)
+            else:
+                response = urllib2.urlopen(request)
             response_body = response.read()
         except:
             if (isinstance(self.proxy_list, ProxyList)):
