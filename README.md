@@ -11,7 +11,7 @@ Jooforce is a small Python application used to test the vulnerability of Joomla 
 ## Quick Start
 1. Download the latest copy of jooforce [here](https://github.com/intninety/jooforce/zipball/master)
 2. Open a shell and navigate to the directory you extracted the above file
-3. Run the script using the following command; replacing <url> with the URL of the administrator page you wish to attack, <user> with the username you wish to attempt to login as, and <file> with the full path to the file of passwords you want to use in the attack 
+3. Run the script using the following command; replacing &lt;url&gt; with the URL of the administrator page you wish to attack, &lt;user&gt; with the username you wish to attempt to login as, and &lt;file&gt; with the full path to the file of passwords you want to use in the attack 
 
         python jooforce.py --url <url> --user <user> --dic <file> -v
     __n.b. each password must appear on a new line in the file.__
