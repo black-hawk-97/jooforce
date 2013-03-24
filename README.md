@@ -3,7 +3,7 @@
 Jooforce is a small Python application used to test the vulnerability of Joomla installations against brute force attacks. It supports being able to spoof user-agents and has the ability to automatically switch between different proxies to avoid detection.
 
 ## Author
-- [intninety](http://blog.intninety.co.uk/) ([@int0x90](https://twitter.com/int0x90))
+- [rastating](http://blog.intninety.co.uk/) ([@iamrastating](https://twitter.com/iamrastating))
 
 ## Contributors
 - [Phyushin](https://github.com/phyushin) ([@phyushin](https://twitter.com/phyushin))
